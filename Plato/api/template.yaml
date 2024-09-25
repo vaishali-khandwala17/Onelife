@@ -1,0 +1,758 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  api
+
+  Plato operation Api
+
+Parameters:
+  ApiGatewayStageName:
+    Default: dev
+    Description: Stage name for the API Gateway
+    Type: String
+
+Globals:
+  Function:
+    Timeout: 900
+    MemorySize: 512
+  Api:
+    Cors:
+      AllowMethods: "'GET,POST,OPTIONS'"
+      AllowHeaders: "'content-type'"
+      AllowOrigin: "'*'"
+
+Resources:
+  libs:
+    Type: AWS::Lambda::LayerVersion
+    Properties:
+      LayerName: postgres_libs
+      Description: psycopg2-binary 2.9.5 python 3.9
+      Content:
+        S3Bucket: one-life-psycopg2
+        S3Key: python.zip
+      CompatibleRuntimes:
+        - python3.9
+
+  OCSDrugDetailsInsertOps:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ocs_drug_details_insert_ops/
+      Handler: lambda_function.lambda_handler
+      Runtime: python3.9
+      Role: arn:aws:iam::978434793574:role/onelife-lambda-role
+      Architectures:
+        - x86_64
+      Layers:
+        - !Ref libs
+
+  OCSInvoiceSchedulerOps:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ocs_invoice_scheduler_ops/
+      Handler: lambda_function.lambda_handler
+      Runtime: python3.9
+      Role: arn:aws:iam::978434793574:role/onelife-lambda-role
+      Architectures:
+        - x86_64
+      Layers:
+        - !Ref libs
+
+  OcsInvoiceListingOps:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ocs_invoice_listing_ops/
+      Handler: lambda_function.lambda_handler
+      Runtime: python3.9
+      Role: arn:aws:iam::978434793574:role/onelife-lambda-role
+      Architectures:
+        - x86_64
+      Layers:
+        - !Ref libs
+
+  OcsInvoiceViewOps:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ocs_invoice_view_ops/
+      Handler: lambda_function.lambda_handler
+      Runtime: python3.9
+      Role: arn:aws:iam::978434793574:role/onelife-lambda-role
+      Architectures:
+        - x86_64
+      Layers:
+        - !Ref libs
+
+  OcsMnemonicViewOps:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ocs_mnemonic_view_ops/
+      Handler: lambda_function.lambda_handler
+      Runtime: python3.9
+      Role: arn:aws:iam::978434793574:role/onelife-lambda-role
+      Architectures:
+        - x86_64
+      Layers:
+        - !Ref libs
+
+  OcsDailyDoseViewOps:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ocs_daily_dose_view_ops/
+      Handler: lambda_function.lambda_handler
+      Runtime: python3.9
+      Role: arn:aws:iam::978434793574:role/onelife-lambda-role
+      Architectures:
+        - x86_64
+      Layers:
+        - !Ref libs
+
+  PatientGetOps:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: patient_get_ops/
+      Handler: lambda_function.lambda_handler
+      Runtime: python3.9
+      Role: arn:aws:iam::978434793574:role/onelife-lambda-role
+      Architectures:
+        - x86_64
+      Layers:
+        - !Ref libs
+
+  PatientInsertOps:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: patient_insert_ops/
+      Handler: lambda_function.lambda_handler
+      Runtime: python3.9
+      Role: arn:aws:iam::978434793574:role/onelife-lambda-role
+      Architectures:
+        - x86_64
+      Layers:
+        - !Ref libs
+
+  PatientGetInvoiceOps:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: patient_get_invoice_ops/
+      Handler: lambda_function.lambda_handler
+      Runtime: python3.9
+      Role: arn:aws:iam::978434793574:role/onelife-lambda-role
+      Architectures:
+        - x86_64
+      Layers:
+        - !Ref libs
+
+  PatientSchedulerOps:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: patient_scheduler_ops/
+      Handler: lambda_function.lambda_handler
+      Runtime: python3.9
+      Role: arn:aws:iam::978434793574:role/onelife-lambda-role
+      Architectures:
+        - x86_64
+      Layers:
+        - !Ref libs
+
+  PatientDialEventRule:
+    Type: AWS::Events::Rule
+    Properties:
+      ScheduleExpression: rate(30 minutes)
+      Targets:
+        - Arn: !GetAtt PatientSchedulerOps.Arn
+          Id: "TagEventsTargetLambda"
+
+  InvoiceDialEventRule:
+    Type: AWS::Events::Rule
+    Properties:
+      ScheduleExpression: rate(30 minutes)
+      Targets:
+        - Arn: !GetAtt OCSInvoiceSchedulerOps.Arn
+          Id: "TagEventsTargetLambda"
+
+  apiGateway:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Description: Example API Gateway
+      EndpointConfiguration:
+        Types:
+          - REGIONAL
+      Name: plato-ops
+
+  MyApiKey:
+    Type: "AWS::ApiGateway::ApiKey"
+    Properties:
+      Description: "My API key"
+      Enabled: true
+      GenerateDistinctId: true
+      Name: "x-api-key"
+      StageKeys:
+        - RestApiId: !Ref apiGateway
+          StageName: dev
+
+  MyUsagePlan:
+    Type: "AWS::ApiGateway::UsagePlan"
+    Properties:
+      UsagePlanName: "plato-usage-plan"
+      Description: "My usage plan"
+      ApiStages:
+        - ApiId: !Ref apiGateway
+          Stage: dev
+
+  MyUsagePlanKey:
+    Type: "AWS::ApiGateway::UsagePlanKey"
+    Properties:
+      KeyId: !Ref MyApiKey
+      KeyType: "API_KEY"
+      UsagePlanId: !Ref MyUsagePlan
+
+  OcsDrugDetailsInsertResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref apiGateway
+      ParentId: !GetAtt
+        - apiGateway
+        - RootResourceId
+      PathPart: ocs-drug-details-insert
+
+  OcsInvoiceViewResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref apiGateway
+      ParentId: !GetAtt
+        - apiGateway
+        - RootResourceId
+      PathPart: ocs-invoice-view
+
+  OcsMnemonicViewResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref apiGateway
+      ParentId: !GetAtt
+        - apiGateway
+        - RootResourceId
+      PathPart: ocs-mnemonic-view
+
+  OcsDailyDoseViewResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref apiGateway
+      ParentId: !GetAtt
+        - apiGateway
+        - RootResourceId
+      PathPart: ocs-daily-dose-view
+
+  OcsInvoiceListingResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref apiGateway
+      ParentId: !GetAtt
+        - apiGateway
+        - RootResourceId
+      PathPart: ocs-invoice-list
+
+  PatientInsertResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref apiGateway
+      ParentId: !GetAtt
+        - apiGateway
+        - RootResourceId
+      PathPart: patient-insert
+
+  PatientGetResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref apiGateway
+      ParentId: !GetAtt
+        - apiGateway
+        - RootResourceId
+      PathPart: get-patient
+
+  PatientGetInvoiceResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref apiGateway
+      ParentId: !GetAtt
+        - apiGateway
+        - RootResourceId
+      PathPart: get-invoice
+
+  ApiGatewayOcsDrugDetailsInsertMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      ApiKeyRequired: true
+      AuthorizationType: NONE
+      HttpMethod: POST
+      Integration:
+        IntegrationHttpMethod: POST
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseTemplates:
+              text/plain: $input.path('$.body')
+            ResponseParameters:
+              method.response.header.Content-Disposition: integration.response.body.headers.Content-Disposition
+              method.response.header.Content-Type: integration.response.body.headers.Content-Type
+              method.response.header.X-Requested-With: "'*'"
+              method.response.header.Access-Control-Allow-Headers: "'*'"
+              method.response.header.Access-Control-Allow-Methods: "'POST, OPTIONS'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+              method.response.header.Access-Control-Expose-Headers: "'*'"
+        PassthroughBehavior: WHEN_NO_TEMPLATES
+        TimeoutInMillis: 29000
+        Type: AWS
+        Uri: !Sub
+          - 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${lambdaArn}/invocations'
+          - lambdaArn: !GetAtt OCSDrugDetailsInsertOps.Arn
+      MethodResponses:
+        - ResponseModels:
+            application/json: 'Empty'
+          ResponseParameters:
+            method.response.header.Content-Disposition: true
+            method.response.header.Content-Type: true
+            method.response.header.X-Requested-With: true
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+            method.response.header.Access-Control-Expose-Headers: true
+          StatusCode: 200
+      OperationName: 'OCS Drug details insert'
+      ResourceId: !Ref OcsDrugDetailsInsertResource
+      RestApiId: !Ref apiGateway
+
+  ApiGatewayOcsDailyDoseViewMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      ApiKeyRequired: true
+      AuthorizationType: NONE
+      HttpMethod: GET
+      Integration:
+        IntegrationHttpMethod: POST
+        IntegrationResponses:
+          - ResponseTemplates: { "application/json": "" }
+            ResponseParameters:
+              method.response.header.X-Requested-With: "'*'"
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,x-requested-with'"
+              method.response.header.Access-Control-Allow-Methods: "'GET,
+                OPTIONS'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+            StatusCode: 200
+        PassthroughBehavior: WHEN_NO_TEMPLATES
+        TimeoutInMillis: 29000
+        Type: AWS
+        Uri: !Sub
+          - 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${lambdaArn}/invocations'
+          - lambdaArn: !GetAtt OcsDailyDoseViewOps.Arn
+        RequestTemplates:
+          application/json: "{ \"search_value\": \"$input.params('search_value')\"}"
+      MethodResponses:
+        - ResponseModels:
+            application/json: 'Empty'
+          ResponseParameters:
+            method.response.header.X-Requested-With: false
+            method.response.header.Access-Control-Allow-Headers: false
+            method.response.header.Access-Control-Allow-Methods: false
+            method.response.header.Access-Control-Allow-Origin: false
+          StatusCode: 200
+      OperationName: 'ocs Daily Dose view operation'
+      ResourceId: !Ref OcsDailyDoseViewResource
+      RestApiId: !Ref apiGateway
+
+  ApiGatewayOcsMnemonicViewMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      ApiKeyRequired: true
+      AuthorizationType: NONE
+      HttpMethod: GET
+      Integration:
+        IntegrationHttpMethod: POST
+        IntegrationResponses:
+          - ResponseTemplates: { "application/json": "" }
+            ResponseParameters:
+              method.response.header.X-Requested-With: "'*'"
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,x-requested-with'"
+              method.response.header.Access-Control-Allow-Methods: "'GET,
+                OPTIONS'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+            StatusCode: 200
+        PassthroughBehavior: WHEN_NO_TEMPLATES
+        TimeoutInMillis: 29000
+        Type: AWS
+        Uri: !Sub
+          - 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${lambdaArn}/invocations'
+          - lambdaArn: !GetAtt OcsMnemonicViewOps.Arn
+        RequestTemplates:
+          application/json: "{ \"search_value\": \"$input.params('search_value')\"}"
+      MethodResponses:
+        - ResponseModels:
+            application/json: 'Empty'
+          ResponseParameters:
+            method.response.header.X-Requested-With: false
+            method.response.header.Access-Control-Allow-Headers: false
+            method.response.header.Access-Control-Allow-Methods: false
+            method.response.header.Access-Control-Allow-Origin: false
+          StatusCode: 200
+      OperationName: 'ocs mnemonic operation'
+      ResourceId: !Ref OcsMnemonicViewResource
+      RestApiId: !Ref apiGateway
+
+  ApiGatewayOcsInvoiceViewMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      ApiKeyRequired: true
+      AuthorizationType: NONE
+      HttpMethod: GET
+      Integration:
+        IntegrationHttpMethod: POST
+        IntegrationResponses:
+          - ResponseTemplates: { "application/json": "" }
+            ResponseParameters:
+              method.response.header.X-Requested-With: "'*'"
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,x-requested-with'"
+              method.response.header.Access-Control-Allow-Methods: "'GET,
+                OPTIONS'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+            StatusCode: 200
+        PassthroughBehavior: WHEN_NO_TEMPLATES
+        TimeoutInMillis: 29000
+        Type: AWS
+        Uri: !Sub
+          - 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${lambdaArn}/invocations'
+          - lambdaArn: !GetAtt OcsInvoiceViewOps.Arn
+        RequestTemplates:
+          application/json: "{ \"invoices_id\": \"$input.params('invoices_id')\"}"
+      MethodResponses:
+        - ResponseModels:
+            application/json: 'Empty'
+          ResponseParameters:
+            method.response.header.X-Requested-With: false
+            method.response.header.Access-Control-Allow-Headers: false
+            method.response.header.Access-Control-Allow-Methods: false
+            method.response.header.Access-Control-Allow-Origin: false
+          StatusCode: 200
+      OperationName: 'ocs invoice view operation'
+      ResourceId: !Ref OcsInvoiceViewResource
+      RestApiId: !Ref apiGateway
+
+  ApiGatewayOcsInvoiceListingMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      ApiKeyRequired: true
+      AuthorizationType: NONE
+      HttpMethod: GET
+      Integration:
+        IntegrationHttpMethod: POST
+        IntegrationResponses:
+          - ResponseTemplates: { "application/json": "" }
+            ResponseParameters:
+              method.response.header.X-Requested-With: "'*'"
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,x-requested-with'"
+              method.response.header.Access-Control-Allow-Methods: "'GET,
+              OPTIONS'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+            StatusCode: 200
+        PassthroughBehavior: WHEN_NO_TEMPLATES
+        TimeoutInMillis: 29000
+        Type: AWS
+        Uri: !Sub
+          - 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${lambdaArn}/invocations'
+          - lambdaArn: !GetAtt OcsInvoiceListingOps.Arn
+        RequestTemplates:
+          application/json: "{ \"page_size\": \"$input.params('page_size')\", \"page_number\": \"$input.params('page_number')\", \"patient_id\": \"$input.params('patient_id')\", \"medicine_filter\": \"$input.params('medicine_filter')\", \"invoice_number\": \"$input.params('invoice_number')\"}"
+      MethodResponses:
+        - ResponseModels:
+            application/json: 'Empty'
+          ResponseParameters:
+            method.response.header.X-Requested-With: false
+            method.response.header.Access-Control-Allow-Headers: false
+            method.response.header.Access-Control-Allow-Methods: false
+            method.response.header.Access-Control-Allow-Origin: false
+          StatusCode: 200
+      OperationName: 'ocs invoice list operation'
+      ResourceId: !Ref OcsInvoiceListingResource
+      RestApiId: !Ref apiGateway
+
+  ApiGatewayPatientInsertMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      ApiKeyRequired: false
+      AuthorizationType: NONE
+      HttpMethod: POST
+      Integration:
+        IntegrationHttpMethod: POST
+        IntegrationResponses:
+          - ResponseTemplates: { "application/json": "" }
+            ResponseParameters:
+              method.response.header.X-Requested-With: "'*'"
+              method.response.header.Access-Control-Allow-Headers: "'*'"
+              method.response.header.Access-Control-Allow-Methods: "'POST,
+                OPTIONS'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+            StatusCode: 200
+        PassthroughBehavior: WHEN_NO_TEMPLATES
+        TimeoutInMillis: 29000
+        Type: AWS
+        Uri: !Sub
+          - 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${lambdaArn}/invocations'
+          - lambdaArn: !GetAtt PatientInsertOps.Arn
+      MethodResponses:
+        - ResponseModels:
+            application/json: 'Empty'
+          ResponseParameters:
+            method.response.header.X-Requested-With: true
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+          StatusCode: 200
+      OperationName: 'patient insert operation name'
+      ResourceId: !Ref PatientInsertResource
+      RestApiId: !Ref apiGateway
+
+  ApiGatewayPatientGetMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      ApiKeyRequired: false
+      AuthorizationType: NONE
+      HttpMethod: GET
+      RequestParameters:
+        method.request.path.userId: true
+      Integration:
+        IntegrationHttpMethod: POST
+        IntegrationResponses:
+          - ResponseTemplates: { "application/json": "" }
+            ResponseParameters:
+              method.response.header.X-Requested-With: "'*'"
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,x-requested-with'"
+              method.response.header.Access-Control-Allow-Methods: "'GET,
+              OPTIONS'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+            StatusCode: 200
+        PassthroughBehavior: WHEN_NO_TEMPLATES
+        TimeoutInMillis: 29000
+        Type: AWS
+        Uri: !Sub
+          - 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${lambdaArn}/invocations'
+          - lambdaArn: !GetAtt PatientGetOps.Arn
+        RequestTemplates:
+          application/json: "{ \"patient_id\": \"$input.params('patient_id')\"}"
+      MethodResponses:
+        - ResponseModels:
+            application/json: 'Empty'
+          ResponseParameters:
+            method.response.header.X-Requested-With: false
+            method.response.header.Access-Control-Allow-Headers: false
+            method.response.header.Access-Control-Allow-Methods: false
+            method.response.header.Access-Control-Allow-Origin: false
+          StatusCode: 200
+      OperationName: 'patient get operation'
+      ResourceId: !Ref PatientGetResource
+      RestApiId: !Ref apiGateway
+
+  ApiGatewayPatientGetInvoiceMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      ApiKeyRequired: false
+      AuthorizationType: NONE
+      HttpMethod: GET
+      Integration:
+        IntegrationHttpMethod: POST
+        IntegrationResponses:
+          - ResponseTemplates: { "application/json": "" }
+            ResponseParameters:
+              method.response.header.X-Requested-With: "'*'"
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,x-requested-with'"
+              method.response.header.Access-Control-Allow-Methods: "'GET,
+              OPTIONS'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+            StatusCode: 200
+        PassthroughBehavior: WHEN_NO_TEMPLATES
+        TimeoutInMillis: 29000
+        Type: AWS
+        Uri: !Sub
+          - 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${lambdaArn}/invocations'
+          - lambdaArn: !GetAtt PatientGetInvoiceOps.Arn
+        RequestTemplates:
+          application/json: "{ \"patient_id\": \"$input.params('patient_id')\"}"
+      MethodResponses:
+        - ResponseModels:
+            application/json: 'Empty'
+          ResponseParameters:
+            method.response.header.X-Requested-With: false
+            method.response.header.Access-Control-Allow-Headers: false
+            method.response.header.Access-Control-Allow-Methods: false
+            method.response.header.Access-Control-Allow-Origin: false
+          StatusCode: 200
+      OperationName: 'patient get invoices operation'
+      ResourceId: !Ref PatientGetInvoiceResource
+      RestApiId: !Ref apiGateway
+
+  DrugDetailsModel:
+    Type: AWS::ApiGateway::Model
+    Properties:
+      ContentType: 'application/json'
+      RestApiId: !Ref apiGateway
+      Schema: { }
+
+  PatientModel:
+    Type: AWS::ApiGateway::Model
+    Properties:
+      ContentType: 'application/json'
+      RestApiId: !Ref apiGateway
+      Schema: { }
+
+  PatientGetModel:
+    Type: AWS::ApiGateway::Model
+    Properties:
+      ContentType: 'application/json'
+      RestApiId: !Ref apiGateway
+      Schema: { }
+
+  apiGatewayOcsDrugDetailsInsertDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn:
+      - ApiGatewayOcsDrugDetailsInsertMethod
+    Properties:
+      RestApiId: !Ref apiGateway
+
+  apiGatewayOcsInvoiceViewDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn:
+      - ApiGatewayOcsInvoiceViewMethod
+    Properties:
+      RestApiId: !Ref apiGateway
+      StageName: !Ref ApiGatewayStage
+
+  apiGatewayOcsMnemonicViewDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn:
+      - ApiGatewayOcsMnemonicViewMethod
+    Properties:
+      RestApiId: !Ref apiGateway
+      StageName: !Ref ApiGatewayStage
+
+  apiGatewayOcsDailyDoseViewDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn:
+      - ApiGatewayOcsDailyDoseViewMethod
+    Properties:
+      RestApiId: !Ref apiGateway
+      StageName: !Ref ApiGatewayStage
+
+  apiGatewayOcsInvoiceListingDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn:
+      - ApiGatewayOcsInvoiceListingMethod
+    Properties:
+      RestApiId: !Ref apiGateway
+      StageName: !Ref ApiGatewayStage
+
+  apiGatewayPatientInsertDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn:
+      - ApiGatewayPatientInsertMethod
+    Properties:
+      RestApiId: !Ref apiGateway
+      StageName: !Ref ApiGatewayStage
+
+  apiGatewayPatientGetDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn:
+      - ApiGatewayPatientGetMethod
+    Properties:
+      RestApiId: !Ref apiGateway
+      StageName: !Ref ApiGatewayStage
+
+  apiGatewayPatientGetInvoiceDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn:
+      - ApiGatewayPatientGetInvoiceMethod
+    Properties:
+      RestApiId: !Ref apiGateway
+      StageName: !Ref ApiGatewayStage
+
+  ApiGatewayStage:
+    Type: AWS::ApiGateway::Stage
+    Properties:
+      DeploymentId: !Ref apiGatewayOcsDrugDetailsInsertDeployment
+      Description: Lambda API Stage
+      RestApiId: !Ref apiGateway
+      StageName: !Ref ApiGatewayStageName
+
+  LambdaDrugDetailsInsertInvoke:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: "lambda:InvokeFunction"
+      FunctionName: !GetAtt OCSDrugDetailsInsertOps.Arn
+      Principal: "apigateway.amazonaws.com"
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${apiGateway}/*/*
+
+  LambdaInvoiceDialInvoke:
+    Type: "AWS::Lambda::Permission"
+    Properties:
+      Action: "lambda:InvokeFunction"
+      FunctionName: !Ref OCSInvoiceSchedulerOps
+      Principal: "events.amazonaws.com"
+      SourceArn: !GetAtt InvoiceDialEventRule.Arn
+
+  LambdaOcsMnemonicViewInvoke:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: "lambda:InvokeFunction"
+      FunctionName: !GetAtt OcsMnemonicViewOps.Arn
+      Principal: "apigateway.amazonaws.com"
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${apiGateway}/*/*
+
+  LambdaOcsDainlyDoseMasterViewInvoke:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: "lambda:InvokeFunction"
+      FunctionName: !GetAtt OcsDailyDoseViewOps.Arn
+      Principal: "apigateway.amazonaws.com"
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${apiGateway}/*/*
+
+  LambdaOcsInvoiceViewInvoke:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: "lambda:InvokeFunction"
+      FunctionName: !GetAtt OcsInvoiceViewOps.Arn
+      Principal: "apigateway.amazonaws.com"
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${apiGateway}/*/*
+
+  LambdaOcsInvoiceListingInvoke:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: "lambda:InvokeFunction"
+      FunctionName: !GetAtt OcsInvoiceListingOps.Arn
+      Principal: "apigateway.amazonaws.com"
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${apiGateway}/*/*
+
+  LambdaPatientInsertInvoke:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: "lambda:InvokeFunction"
+      FunctionName: !GetAtt PatientInsertOps.Arn
+      Principal: "apigateway.amazonaws.com"
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${apiGateway}/*/*
+
+  LambdaPatientDialInvoke:
+    Type: "AWS::Lambda::Permission"
+    Properties:
+      Action: "lambda:InvokeFunction"
+      FunctionName: !Ref PatientSchedulerOps
+      Principal: "events.amazonaws.com"
+      SourceArn: !GetAtt PatientDialEventRule.Arn
+
+  LambdaPatientGetInvoke:
+    Type: "AWS::Lambda::Permission"
+    Properties:
+      Action: "lambda:InvokeFunction"
+      FunctionName: !GetAtt PatientGetOps.Arn
+      Principal: "apigateway.amazonaws.com"
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${apiGateway}/*/*
+
+  LambdaPatientGetInvoiceInvoke:
+    Type: "AWS::Lambda::Permission"
+    Properties:
+      Action: "lambda:InvokeFunction"
+      FunctionName: !GetAtt PatientGetInvoiceOps.Arn
+      Principal: "apigateway.amazonaws.com"
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${apiGateway}/*/*

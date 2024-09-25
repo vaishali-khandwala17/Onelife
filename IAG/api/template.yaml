@@ -1,0 +1,767 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  api
+
+  IAG operation Api
+
+Parameters:
+  ApiGatewayStageName:
+    Default: dev
+    Description: Stage name for the API Gateway
+    Type: String
+
+Globals:
+  Function:
+    Timeout: 900
+    MemorySize: 512
+  Api:
+    Cors:
+      AllowMethods: "'GET,POST,OPTIONS'"
+      AllowHeaders: "'content-type'"
+      AllowOrigin: "'*'"
+
+Resources:
+  libs:
+    Type: AWS::Lambda::LayerVersion
+    Properties:
+      LayerName: postgres_libs
+      Description: psycopg2-binary 2.9.5 python 3.9
+      Content:
+        S3Bucket: one-life-psycopg2
+        S3Key: python.zip
+      CompatibleRuntimes:
+        - python3.9
+
+  KsiLoginSendOtpOps:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: Ksi_login_send_otp_ops/
+      Handler: lambda_function.lambda_handler
+      Runtime: python3.9
+      Role: arn:aws:iam::978434793574:role/onelife-lambda-role
+      Architectures:
+        - x86_64
+      Layers:
+        - !Ref libs
+
+  KsiLoginOps:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ksi_login_ops/
+      Handler: lambda_function.lambda_handler
+      Runtime: python3.9
+      Role: arn:aws:iam::978434793574:role/onelife-lambda-role
+      Architectures:
+        - x86_64
+      Layers:
+        - !Ref libs
+
+  TenantRegistrationOps:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: tenant_registration_ops/
+      Handler: lambda_function.lambda_handler
+      Runtime: python3.9
+      Role: arn:aws:iam::978434793574:role/onelife-lambda-role
+      Architectures:
+        - x86_64
+      Layers:
+        - !Ref libs
+
+  UserRegistrationSendOtpOps:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: user_registration_otp_send_ops/
+      Handler: lambda_function.lambda_handler
+      Runtime: python3.9
+      Role: arn:aws:iam::978434793574:role/onelife-lambda-role
+      Architectures:
+        - x86_64
+      Layers:
+        - !Ref libs
+
+  UserRegistrationVerifyOtpOps:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: user_registration_otp_verify_ops/
+      Handler: lambda_function.lambda_handler
+      Runtime: python3.9
+      Role: arn:aws:iam::978434793574:role/onelife-lambda-role
+      Architectures:
+        - x86_64
+      Layers:
+        - !Ref libs
+
+  UserRegistrationOps:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: user_registration_ops/
+      Handler: lambda_function.lambda_handler
+      Runtime: python3.9
+      Role: arn:aws:iam::978434793574:role/onelife-lambda-role
+      Architectures:
+        - x86_64
+      Layers:
+        - !Ref libs
+
+  TenantListingOps:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: tenant_listing_ops/
+      Handler: lambda_function.lambda_handler
+      Runtime: python3.9
+      Role: arn:aws:iam::978434793574:role/onelife-lambda-role
+      Architectures:
+        - x86_64
+      Layers:
+        - !Ref libs
+
+  UserListingOps:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: user_listing_ops/
+      Handler: lambda_function.lambda_handler
+      Runtime: python3.9
+      Role: arn:aws:iam::978434793574:role/onelife-lambda-role
+      Architectures:
+        - x86_64
+      Layers:
+        - !Ref libs
+
+  GetUserInfoOps:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: get_user_info_ops/
+      Handler: lambda_function.lambda_handler
+      Runtime: python3.9
+      Role: arn:aws:iam::978434793574:role/onelife-lambda-role
+      Architectures:
+        - x86_64
+      Layers:
+        - !Ref libs
+
+  apiGateway:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Description: Example API Gateway
+      EndpointConfiguration:
+        Types:
+          - REGIONAL
+      Name: IAG-ops
+
+  MyUsagePlan:
+    Type: "AWS::ApiGateway::UsagePlan"
+    Properties:
+      UsagePlanName: "IAG-usage-plan"
+      Description: "My usage plan"
+      ApiStages:
+        - ApiId: !Ref apiGateway
+          Stage: dev
+
+  MyUsagePlanKey:
+    Type: "AWS::ApiGateway::UsagePlanKey"
+    Properties:
+      KeyId: m110w5tduk
+      KeyType: "API_KEY"
+      UsagePlanId: !Ref MyUsagePlan
+
+  UserOneLifeDevAuthorizer:
+    Type: 'AWS::ApiGateway::Authorizer'
+    Properties:
+      Name: UerCognitoOneLifeAuth
+      IdentitySource: method.request.header.Authorization
+      Type: COGNITO_USER_POOLS
+      ProviderARNs:
+        - "arn:aws:cognito-idp:us-east-2:978434793574:userpool/us-east-2_oFybeqKDp"
+      RestApiId: !Ref apiGateway
+      AuthorizerResultTtlInSeconds: 300
+
+  TenantRegistrationResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref apiGateway
+      ParentId: !GetAtt
+        - apiGateway
+        - RootResourceId
+      PathPart: tenant-register
+
+  UserRegistrationResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref apiGateway
+      ParentId: !GetAtt
+        - apiGateway
+        - RootResourceId
+      PathPart: user-register
+
+  UserRegistrationVerifyOtpResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref apiGateway
+      ParentId: !GetAtt
+        - apiGateway
+        - RootResourceId
+      PathPart: user-register-verify-otp
+
+  UserRegistrationSendOtpResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref apiGateway
+      ParentId: !GetAtt
+        - apiGateway
+        - RootResourceId
+      PathPart: user-register-send-otp
+
+  GetUserInfoResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref apiGateway
+      ParentId: !GetAtt
+        - apiGateway
+        - RootResourceId
+      PathPart: get-user-info
+
+  KsiLoginSendOtpResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref apiGateway
+      ParentId: !GetAtt
+        - apiGateway
+        - RootResourceId
+      PathPart: ksi-login-send-otp
+
+  KsiLoginResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref apiGateway
+      ParentId: !GetAtt
+        - apiGateway
+        - RootResourceId
+      PathPart: ksi-login
+
+  TenantListingResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref apiGateway
+      ParentId: !GetAtt
+        - apiGateway
+        - RootResourceId
+      PathPart: tenant-list
+
+  UserListingResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref apiGateway
+      ParentId: !GetAtt
+        - apiGateway
+        - RootResourceId
+      PathPart: user-list
+
+  ApiGatewayTenantRegistrationMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      ApiKeyRequired: true
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref UserOneLifeDevAuthorizer
+      HttpMethod: POST
+      Integration:
+        IntegrationHttpMethod: POST
+        IntegrationResponses:
+          - ResponseTemplates: { "application/json": "" }
+            ResponseParameters:
+              method.response.header.X-Requested-With: "'*'"
+              method.response.header.Access-Control-Allow-Headers: "'*'"
+              method.response.header.Access-Control-Allow-Methods: "'POST,
+                OPTIONS'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+            StatusCode: 200
+        PassthroughBehavior: WHEN_NO_TEMPLATES
+        TimeoutInMillis: 29000
+        Type: AWS
+        Uri: !Sub
+          - 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${lambdaArn}/invocations'
+          - lambdaArn: !GetAtt TenantRegistrationOps.Arn
+        RequestTemplates:
+          application/json: "{\"headers\":{ \"username\": \"$context.authorizer.claims['cognito:username']\", \"name\": \"$context.authorizer.claims.name\"}, \"body\":$input.json('$')}"
+      MethodResponses:
+        - ResponseModels:
+            application/json: 'Empty'
+          ResponseParameters:
+            method.response.header.X-Requested-With: true
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+          StatusCode: 200
+      OperationName: 'tenant registration operation'
+      ResourceId: !Ref TenantRegistrationResource
+      RestApiId: !Ref apiGateway
+
+  ApiGatewayUserRegistrationMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      ApiKeyRequired: true
+      AuthorizationType: NONE
+      HttpMethod: POST
+      Integration:
+        IntegrationHttpMethod: POST
+        IntegrationResponses:
+          - ResponseTemplates: { "application/json": "" }
+            ResponseParameters:
+              method.response.header.X-Requested-With: "'*'"
+              method.response.header.Access-Control-Allow-Headers: "'*'"
+              method.response.header.Access-Control-Allow-Methods: "'POST,
+                  OPTIONS'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+            StatusCode: 200
+        PassthroughBehavior: WHEN_NO_TEMPLATES
+        TimeoutInMillis: 29000
+        Type: AWS
+        Uri: !Sub
+          - 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${lambdaArn}/invocations'
+          - lambdaArn: !GetAtt UserRegistrationOps.Arn
+        RequestTemplates:
+          application/json: "{\"headers\":{\"Authorization\":\"$input.params().header.get('Authorization')\"}, \"body\":$input.json('$')}"
+      MethodResponses:
+        - ResponseModels:
+            application/json: 'Empty'
+          ResponseParameters:
+            method.response.header.X-Requested-With: true
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+          StatusCode: 200
+      OperationName: 'user registration operation name'
+      ResourceId: !Ref UserRegistrationResource
+      RestApiId: !Ref apiGateway
+
+  ApiGatewayUserRegistrationSendOtpMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      ApiKeyRequired: true
+      AuthorizationType: NONE
+      HttpMethod: POST
+      Integration:
+        IntegrationHttpMethod: POST
+        IntegrationResponses:
+          - ResponseTemplates: { "application/json": "" }
+            ResponseParameters:
+              method.response.header.X-Requested-With: "'*'"
+              method.response.header.Access-Control-Allow-Headers: "'*'"
+              method.response.header.Access-Control-Allow-Methods: "'POST,
+                  OPTIONS'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+            StatusCode: 200
+        PassthroughBehavior: WHEN_NO_TEMPLATES
+        TimeoutInMillis: 29000
+        Type: AWS
+        Uri: !Sub
+          - 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${lambdaArn}/invocations'
+          - lambdaArn: !GetAtt UserRegistrationSendOtpOps.Arn
+        RequestTemplates:
+          application/json: "{\"headers\":{\"Authorization\":\"$input.params().header.get('Authorization')\"}, \"body\":$input.json('$')}"
+      MethodResponses:
+        - ResponseModels:
+            application/json: 'Empty'
+          ResponseParameters:
+            method.response.header.X-Requested-With: true
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+          StatusCode: 200
+      OperationName: 'user registration send otp operation'
+      ResourceId: !Ref UserRegistrationSendOtpResource
+      RestApiId: !Ref apiGateway
+
+  ApiGatewayUserRegistrationVerifyOtpMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      ApiKeyRequired: true
+      AuthorizationType: NONE
+      HttpMethod: POST
+      Integration:
+        IntegrationHttpMethod: POST
+        IntegrationResponses:
+          - ResponseTemplates: { "application/json": "" }
+            ResponseParameters:
+              method.response.header.X-Requested-With: "'*'"
+              method.response.header.Access-Control-Allow-Headers: "'*'"
+              method.response.header.Access-Control-Allow-Methods: "'POST,
+                  OPTIONS'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+            StatusCode: 200
+        PassthroughBehavior: WHEN_NO_TEMPLATES
+        TimeoutInMillis: 29000
+        Type: AWS
+        Uri: !Sub
+          - 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${lambdaArn}/invocations'
+          - lambdaArn: !GetAtt UserRegistrationVerifyOtpOps.Arn
+        RequestTemplates:
+          application/json: "{\"headers\":{\"Authorization\":\"$input.params().header.get('Authorization')\"}, \"body\":$input.json('$')}"
+      MethodResponses:
+        - ResponseModels:
+            application/json: 'Empty'
+          ResponseParameters:
+            method.response.header.X-Requested-With: true
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+          StatusCode: 200
+      OperationName: 'user registration verify otp operation'
+      ResourceId: !Ref UserRegistrationVerifyOtpResource
+      RestApiId: !Ref apiGateway
+
+  ApiGatewayGetUserInfoMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      ApiKeyRequired: true
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref UserOneLifeDevAuthorizer
+      HttpMethod: GET
+      Integration:
+        IntegrationHttpMethod: POST
+        IntegrationResponses:
+          - ResponseTemplates: { "application/json": "" }
+            ResponseParameters:
+              method.response.header.X-Requested-With: "'*'"
+              method.response.header.Access-Control-Allow-Headers: "'*'"
+              method.response.header.Access-Control-Allow-Methods: "'POST,
+                  OPTIONS'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+            StatusCode: 200
+        PassthroughBehavior: WHEN_NO_TEMPLATES
+        TimeoutInMillis: 29000
+        Type: AWS
+        Uri: !Sub
+          - 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${lambdaArn}/invocations'
+          - lambdaArn: !GetAtt GetUserInfoOps.Arn
+        RequestTemplates:
+          application/json: "{ \"username\": \"$context.authorizer.claims['cognito:username']\", \"name\": \"$context.authorizer.claims.name\"}"
+      MethodResponses:
+        - ResponseModels:
+            application/json: 'Empty'
+          ResponseParameters:
+            method.response.header.X-Requested-With: true
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+          StatusCode: 200
+      OperationName: 'get user info operation'
+      ResourceId: !Ref GetUserInfoResource
+      RestApiId: !Ref apiGateway
+
+  ApiGatewayKsiLoginSendOtpMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      ApiKeyRequired: true
+      AuthorizationType: NONE
+      HttpMethod: POST
+      Integration:
+        IntegrationHttpMethod: POST
+        IntegrationResponses:
+          - ResponseTemplates: { "application/json": "" }
+            ResponseParameters:
+              method.response.header.X-Requested-With: "'*'"
+              method.response.header.Access-Control-Allow-Headers: "'*'"
+              method.response.header.Access-Control-Allow-Methods: "'POST,
+                  OPTIONS'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+            StatusCode: 200
+        PassthroughBehavior: WHEN_NO_TEMPLATES
+        TimeoutInMillis: 29000
+        Type: AWS
+        Uri: !Sub
+          - 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${lambdaArn}/invocations'
+          - lambdaArn: !GetAtt KsiLoginSendOtpOps.Arn
+      MethodResponses:
+        - ResponseModels:
+            application/json: 'Empty'
+          ResponseParameters:
+            method.response.header.X-Requested-With: true
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+          StatusCode: 200
+      OperationName: 'ksi login send otp operation'
+      ResourceId: !Ref KsiLoginSendOtpResource
+      RestApiId: !Ref apiGateway
+
+  ApiGatewayKsiLoginMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      ApiKeyRequired: true
+      AuthorizationType: NONE
+      HttpMethod: POST
+      Integration:
+        IntegrationHttpMethod: POST
+        IntegrationResponses:
+          - ResponseTemplates: { "application/json": "" }
+            ResponseParameters:
+              method.response.header.X-Requested-With: "'*'"
+              method.response.header.Access-Control-Allow-Headers: "'*'"
+              method.response.header.Access-Control-Allow-Methods: "'POST,
+                    OPTIONS'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+            StatusCode: 200
+        PassthroughBehavior: WHEN_NO_TEMPLATES
+        TimeoutInMillis: 29000
+        Type: AWS
+        Uri: !Sub
+          - 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${lambdaArn}/invocations'
+          - lambdaArn: !GetAtt KsiLoginOps.Arn
+      MethodResponses:
+        - ResponseModels:
+            application/json: 'Empty'
+          ResponseParameters:
+            method.response.header.X-Requested-With: true
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+          StatusCode: 200
+      OperationName: 'ksi login operation'
+      ResourceId: !Ref KsiLoginResource
+      RestApiId: !Ref apiGateway
+
+  ApiGatewayTenantListingMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      ApiKeyRequired: true
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref UserOneLifeDevAuthorizer
+      HttpMethod: GET
+      Integration:
+        IntegrationHttpMethod: POST
+        IntegrationResponses:
+          - ResponseTemplates: { "application/json": "" }
+            ResponseParameters:
+              method.response.header.X-Requested-With: "'*'"
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,x-requested-with'"
+              method.response.header.Access-Control-Allow-Methods: "'GET,
+                OPTIONS'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+            StatusCode: 200
+        PassthroughBehavior: WHEN_NO_TEMPLATES
+        TimeoutInMillis: 29000
+        Type: AWS
+        Uri: !Sub
+          - 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${lambdaArn}/invocations'
+          - lambdaArn: !GetAtt TenantListingOps.Arn
+        RequestTemplates:
+          application/json: "{\"headers\":{ \"username\": \"$context.authorizer.claims['cognito:username']\", \"name\": \"$context.authorizer.claims.name\"}, \"body\":{ \"page_size\": \"$input.params('page_size')\", \"page_number\": \"$input.params('page_number')\", \"search_value\": \"$input.params('search_value')\"}}"
+      MethodResponses:
+        - ResponseModels:
+            application/json: 'Empty'
+          ResponseParameters:
+            method.response.header.X-Requested-With: false
+            method.response.header.Access-Control-Allow-Headers: false
+            method.response.header.Access-Control-Allow-Methods: false
+            method.response.header.Access-Control-Allow-Origin: false
+          StatusCode: 200
+      OperationName: 'tenant listing operation'
+      ResourceId: !Ref TenantListingResource
+      RestApiId: !Ref apiGateway
+
+  ApiGatewayUserListingMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      ApiKeyRequired: true
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref UserOneLifeDevAuthorizer
+      HttpMethod: GET
+      Integration:
+        IntegrationHttpMethod: POST
+        IntegrationResponses:
+          - ResponseTemplates: { "application/json": "" }
+            ResponseParameters:
+              method.response.header.X-Requested-With: "'*'"
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,x-requested-with'"
+              method.response.header.Access-Control-Allow-Methods: "'GET,
+                OPTIONS'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+            StatusCode: 200
+        PassthroughBehavior: WHEN_NO_TEMPLATES
+        TimeoutInMillis: 29000
+        Type: AWS
+        Uri: !Sub
+          - 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${lambdaArn}/invocations'
+          - lambdaArn: !GetAtt UserListingOps.Arn
+        RequestTemplates:
+          application/json: "{\"headers\":{ \"username\": \"$context.authorizer.claims['cognito:username']\", \"name\": \"$context.authorizer.claims.name\"}, \"body\":{ \"page_size\": \"$input.params('page_size')\", \"page_number\": \"$input.params('page_number')\", \"search_value\": \"$input.params('search_value')\"}}"
+      MethodResponses:
+        - ResponseModels:
+            application/json: 'Empty'
+          ResponseParameters:
+            method.response.header.X-Requested-With: false
+            method.response.header.Access-Control-Allow-Headers: false
+            method.response.header.Access-Control-Allow-Methods: false
+            method.response.header.Access-Control-Allow-Origin: false
+          StatusCode: 200
+      OperationName: 'user listing operation'
+      ResourceId: !Ref UserListingResource
+      RestApiId: !Ref apiGateway
+
+
+  TenantRegisterModel:
+    Type: AWS::ApiGateway::Model
+    Properties:
+      ContentType: 'application/json'
+      RestApiId: !Ref apiGateway
+      Schema: { }
+
+  UserRegisterModel:
+    Type: AWS::ApiGateway::Model
+    Properties:
+      ContentType: 'application/json'
+      RestApiId: !Ref apiGateway
+      Schema: { }
+
+  apiGatewayTenantRegistrationDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn:
+      - ApiGatewayTenantRegistrationMethod
+    Properties:
+      RestApiId: !Ref apiGateway
+
+  apiGatewayUserRegistrationDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn:
+      - ApiGatewayUserRegistrationMethod
+    Properties:
+      RestApiId: !Ref apiGateway
+      StageName: !Ref ApiGatewayStage
+
+  apiGatewayUserRegistrationSendOtpDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn:
+      - ApiGatewayUserRegistrationSendOtpMethod
+    Properties:
+      RestApiId: !Ref apiGateway
+      StageName: !Ref ApiGatewayStage
+
+  apiGatewayUserRegistrationVerifyOtpDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn:
+      - ApiGatewayUserRegistrationVerifyOtpMethod
+    Properties:
+      RestApiId: !Ref apiGateway
+      StageName: !Ref ApiGatewayStage
+
+  apiGatewayGetUserInfoDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn:
+      - ApiGatewayGetUserInfoMethod
+    Properties:
+      RestApiId: !Ref apiGateway
+      StageName: !Ref ApiGatewayStage
+
+  apiGatewayKsiLoginSendOtpDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn:
+      - ApiGatewayKsiLoginSendOtpMethod
+    Properties:
+      RestApiId: !Ref apiGateway
+      StageName: !Ref ApiGatewayStage
+
+  apiGatewayKsiLoginDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn:
+      - ApiGatewayKsiLoginMethod
+    Properties:
+      RestApiId: !Ref apiGateway
+      StageName: !Ref ApiGatewayStage
+
+  apiGatewayTenantListingDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn:
+      - ApiGatewayTenantListingMethod
+    Properties:
+      RestApiId: !Ref apiGateway
+      StageName: !Ref ApiGatewayStage
+
+  apiGatewayUserListingDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn:
+      - ApiGatewayUserListingMethod
+    Properties:
+      RestApiId: !Ref apiGateway
+      StageName: !Ref ApiGatewayStage
+
+  ApiGatewayStage:
+    Type: AWS::ApiGateway::Stage
+    Properties:
+      DeploymentId: !Ref apiGatewayTenantRegistrationDeployment
+      Description: Lambda API Stage
+      RestApiId: !Ref apiGateway
+      StageName: !Ref ApiGatewayStageName
+
+  LambdaTenantRegistrationInvoke:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: "lambda:InvokeFunction"
+      FunctionName: !GetAtt TenantRegistrationOps.Arn
+      Principal: "apigateway.amazonaws.com"
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${apiGateway}/*/*
+
+  LambdaUserRegistrationInvoke:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: "lambda:InvokeFunction"
+      FunctionName: !GetAtt UserRegistrationOps.Arn
+      Principal: "apigateway.amazonaws.com"
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${apiGateway}/*/*
+
+  LambdaUserRegistrationSendOtpInvoke:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: "lambda:InvokeFunction"
+      FunctionName: !GetAtt UserRegistrationSendOtpOps.Arn
+      Principal: "apigateway.amazonaws.com"
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${apiGateway}/*/*
+
+  LambdaUserRegistrationVerifyOtpInvoke:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: "lambda:InvokeFunction"
+      FunctionName: !GetAtt UserRegistrationVerifyOtpOps.Arn
+      Principal: "apigateway.amazonaws.com"
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${apiGateway}/*/*
+
+  LambdaetUserInfoInvoke:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: "lambda:InvokeFunction"
+      FunctionName: !GetAtt GetUserInfoOps.Arn
+      Principal: "apigateway.amazonaws.com"
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${apiGateway}/*/*
+
+  LambdaKsiLoginSendOtpInvoke:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: "lambda:InvokeFunction"
+      FunctionName: !GetAtt KsiLoginSendOtpOps.Arn
+      Principal: "apigateway.amazonaws.com"
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${apiGateway}/*/*
+
+  LambdaKsiLoginInvoke:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: "lambda:InvokeFunction"
+      FunctionName: !GetAtt KsiLoginOps.Arn
+      Principal: "apigateway.amazonaws.com"
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${apiGateway}/*/*
+
+  LambdaTenantListingInvoke:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: "lambda:InvokeFunction"
+      FunctionName: !GetAtt TenantListingOps.Arn
+      Principal: "apigateway.amazonaws.com"
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${apiGateway}/*/*
+
+  LambdaUserListingInvoke:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: "lambda:InvokeFunction"
+      FunctionName: !GetAtt UserListingOps.Arn
+      Principal: "apigateway.amazonaws.com"
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${apiGateway}/*/*
